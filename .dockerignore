@@ -1,0 +1,8 @@
+# Only what the Dockerfile copies is sent to the builder.
+*
+!Dockerfile
+!base/requirements.lock
+!runners/flux3klein/requirements.lock
+!runners/ltx25/requirements.in
+!runners/ltx25/requirements.lock
+!runners/ltx25/compiler_check.c

@@ -1,0 +1,22 @@
+torch==2.13.0
+torchvision==0.28.0
+torchaudio==2.11.1
+transformers==5.14.1
+# The CUDA 13.0 parts torch 2.13.0 was built with; left open, the resolver takes 13.5 parts, newer than the 13.0 the
+# driver reports (a driver 580 host).
+nvidia-nvjitlink==13.0.88
+cuda-bindings==13.0.3
+# The build backend of ltx-core and ltx-pipelines (their pyproject.toml: uv_build>=0.9.8,<0.10), so the Dockerfile builds
+# both from the pinned commit without an unpinned build environment.
+uv-build==0.9.30
+# ComfyUI's kernel library (Apache-2.0), for the INT8 convrot files of B-243: W8A8 on torch._int_mm, a wheel without
+# dependencies.
+comfy-kitchen==0.2.41
+# NATTEN with its CUDA kernels (B-266) for the diffusion decoder's neighborhood attention, the backend upstream's
+# natten extra installs (packages/ltx-core/pyproject.toml); without it the decode falls back to Triton. Upstream pins
+# the build for CUDA 13.2, this is the same release built for torch 2.13.0 and CUDA 13.0, the driver's
+# (https://natten.org/install/, read on 23 Nov 2026). Added to the lock by hand; PyPI has 0.21.7 only as source, which
+# builds libnatten only with the CUDA toolkit's compiler.
+natten @ https://github.com/SHI-Labs/NATTEN/releases/download/v0.21.7/natten-0.21.7%2Btorch2130cu130-cp312-cp312-linux_x86_64.whl
+ltx-core @ git+https://github.com/Lightricks/LTX-2@f0f2f8607189c78a72420b2b63cb1975b5eca179#subdirectory=packages/ltx-core
+ltx-pipelines @ git+https://github.com/Lightricks/LTX-2@f0f2f8607189c78a72420b2b63cb1975b5eca179#subdirectory=packages/ltx-pipelines
