@@ -1,6 +1,6 @@
 ## Project
 
-The public base image of Media Studio's GPU job (`ghcr.io/alsami/media-studio-gpu-base`). Start with [README.md](README.md). There is no application code here: a Dockerfile, locks and a workflow. The private repository pins the built image by digest and adds its own layer.
+The public base image of Media Studio's GPU job (`ghcr.io/alsami/media-studio-gpu-base`). Start with [README.md](README.md). There is no application code here: a Dockerfile, locks and a workflow. The private repository pins the built image by digest and adds its own layer. The runners have one venv each under `/opt/media-studio-gpu/runners/<runner>/.venv` (`flux3klein`, `ltx25`, `kandinsky6`); those paths are a contract with the private layer, so do not rename them. The Kandinsky 6 venv holds Diffusers' pipelines, not the weights.
 
 ## Rules
 
