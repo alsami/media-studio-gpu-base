@@ -1,5 +1,5 @@
 # The public base of the GPU job image: CUDA 12.8 runtime, a pinned Python, one base environment with torch, and one venv
-# per open-model runner (FLUX 3 Klein over the base, LTX-2.5 with its own torch). No weights, no job host, no runner code:
+# per open-model runner (FLUX 3 Klein over the base, LTX-2.5 and Kandinsky 6 with their own torch). No weights, no job host, no runner code:
 # the private repository adds those on top and pins this image by digest.
 # Every package comes from a lock with hashes; build-time checks that need only public packages run here.
 # Built by .github/workflows/build.yml and published as ghcr.io/alsami/media-studio-gpu-base.
@@ -91,15 +91,28 @@ RUN uv venv --python /usr/local/bin/python3 /opt/media-studio-gpu/runners/ltx25/
  && rm -rf /tmp/ltx /root/.triton \
  && /opt/media-studio-gpu/runners/ltx25/.venv/bin/python -c "import torch, transformers, triton, comfy_kitchen; from comfy_kitchen.tensor import TensorWiseINT8Layout; from ltx_core.quantization.policy import QuantizationPolicy, compose_quantization; from ltx_core.loader.units import FuseRule; from ltx_core.loader.sd_ops import SDOps; from ltx_core.loader.module_ops import ModuleOps; from ltx_core.model.transformer import LTXV_MODEL_COMFY_RENAMING_MAP; from ltx_core.text_encoders.gemma import GemmaTextEncoderConfigurator, get_gemma_ops, resolve_gemma_weight_paths; from ltx_core.loader.simple_builder import SimpleBuilder; from ltx_pipelines.utils.blocks import PromptEncoder; from ltx_pipelines.dfr_pipeline import DFRPipeline; from ltx_pipelines.distilled import DistilledPipeline; from ltx_pipelines.utils.media_io import encode_video; from ltx_pipelines.utils.blocks import DiffusionStage; from ltx_pipelines.utils.samplers import euler_denoising_loop; from ltx_pipelines.utils.helpers import cleanup_memory; from ltx_pipelines.dfr_helpers.ops import DETAILING_LORA_STRENGTH; from ltx_core.loader.registry import ModelRegistry; from ltx_core.loader.placement import NO_RETENTION, Placement, RetentionPolicy; from ltx_core.model.video_vae.transformer import natten_available; from ltx_core.model.video_vae.transformer.fallback_na import triton_na_available; import natten; assert natten_available() and natten.HAS_LIBNATTEN, 'natten or libnatten cannot be imported'; print('ltx25 torch', torch.__version__, 'cuda', torch.version.cuda, 'transformers', transformers.__version__, 'triton', triton.__version__, 'natten', natten_available(), 'libnatten', natten.HAS_LIBNATTEN, natten.__version__, 'comfy_kitchen', comfy_kitchen.__file__)"
 
+# Kandinsky 6.0 Video Lite's runner (the distilled 3B model, image to video, through Hugging Face Diffusers) in a venv of
+# its own, with the same torch 2.13.0 for CUDA 13.0 as the LTX venv, whose checks prove that build on the A100 hosts'
+# driver. Diffusers has Kandinsky 6 from 0.42.0 as Kandinsky6TI2VAPipeline (text or image to video and audio) and
+# Kandinsky6SRPipeline (the VSR super resolution); both run on this Python 3.12. The check imports both pipelines, the
+# classes they are built from and what the export needs (PyAV for encode_video, accelerate for the model offload), which
+# needs no GPU and no weights.
+COPY runners/kandinsky6/requirements.lock /opt/media-studio-gpu/runners/kandinsky6/requirements.lock
+RUN uv venv --python /usr/local/bin/python3 /opt/media-studio-gpu/runners/kandinsky6/.venv \
+ && uv pip install --python /opt/media-studio-gpu/runners/kandinsky6/.venv/bin/python --require-hashes --no-deps --only-binary :all: \
+      -r /opt/media-studio-gpu/runners/kandinsky6/requirements.lock \
+ && /opt/media-studio-gpu/runners/kandinsky6/.venv/bin/python -c "import torch, diffusers, transformers, accelerate, av; from diffusers import Kandinsky6TI2VAPipeline, Kandinsky6SRPipeline, Kandinsky6Transformer3DModel, Kandinsky6SRTransformer3DModel, Kandinsky6SRVAE, Kandinsky6SRLatentUpscalerBank, MMAudioVAE, MMAudioVocoder, AutoencoderKLHunyuanVideo, PiflowScheduler, FlowMatchEulerDiscreteScheduler; from diffusers.utils import encode_video, export_to_video; from transformers import CLIPTextModel, CLIPTokenizer, Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLProcessor; print('kandinsky6 venv ok: diffusers', diffusers.__version__, 'torch', torch.__version__, 'cuda', torch.version.cuda, 'transformers', transformers.__version__)"
+
 # The locks again at a fixed path, so a check in an image built on this one can compare installed versions with them,
 # and the commit of this repository the image was built from (last, so a new commit does not rebuild the layers above).
 ARG BASE_COMMIT=unknown
 COPY base/requirements.lock /opt/media-studio-gpu-base/base.requirements.lock
 COPY runners/flux3klein/requirements.lock /opt/media-studio-gpu-base/flux3klein.requirements.lock
 COPY runners/ltx25/requirements.lock /opt/media-studio-gpu-base/ltx25.requirements.lock
+COPY runners/kandinsky6/requirements.lock /opt/media-studio-gpu-base/kandinsky6.requirements.lock
 RUN echo "$BASE_COMMIT" > /opt/media-studio-gpu-base/REVISION
 
 LABEL org.opencontainers.image.title="media-studio-gpu-base" \
-      org.opencontainers.image.description="CUDA 12.8, Python 3.12 and the locked packages of the FLUX 3 Klein and LTX-2.5 runners. No weights." \
+      org.opencontainers.image.description="CUDA 12.8, Python 3.12 and the locked packages of the FLUX 3 Klein, LTX-2.5 and Kandinsky 6 runners. No weights." \
       org.opencontainers.image.source="https://github.com/alsami/media-studio-gpu-base" \
       org.opencontainers.image.revision="$BASE_COMMIT"
