@@ -1,6 +1,6 @@
 # media-studio-gpu-base
 
-The public base image of Media Studio's GPU job: CUDA 12.8, Python 3.12, one base environment with torch, a venv for the FLUX 3 Klein runner and a venv for the LTX-2.5 runner, every package from a lock with hashes. It holds no weights and no private code. The private repository builds a thin top layer on it (its job host and its runners) and serves the final image from its own registry.
+The public base image of Media Studio's GPU job: CUDA 12.8, Python 3.12, one base environment with torch, a venv for the FLUX 3 Klein runner, a venv for the LTX-2.5 runner and a venv for the Kandinsky 6 runner, every package from a lock with hashes. It holds no weights and no private code. The private repository builds a thin top layer on it (its job host and its runners) and serves the final image from its own registry.
 
 Why a separate repository: the heavy part (several GB of torch and CUDA libraries) is public, so it builds here for free on GitHub's runners and is built once, not on every change of the private code.
 
@@ -12,18 +12,20 @@ Why a separate repository: the heavy part (several GB of torch and CUDA librarie
 | `base/requirements.lock` | the base environment (torch 2.10.0 for CUDA 12.8) |
 | `runners/flux3klein/requirements.lock` | the FLUX 3 Klein packages over the base |
 | `runners/ltx25/requirements.lock` | the LTX-2.5 venv's packages (torch 2.13.0 for CUDA 13.0, natten, comfy-kitchen) |
+| `runners/kandinsky6/requirements.lock` | the Kandinsky 6.0 Video Lite venv's packages (diffusers 0.43.0, torch 2.13.0 for CUDA 13.0, transformers, PyAV) |
+| `runners/kandinsky6/requirements.in` | the same, as the versions that were chosen |
 | `runners/ltx25/requirements.in` | the same, plus the commit of LTX-2 that `ltx-core` and `ltx-pipelines` are built from |
 
 The `.in` files and the header of each lock say how the lock is made. The locks are the single source: change a version here, never in the private repository.
 
 In the image:
 
-- `/opt/media-studio-gpu/base/requirements.lock`, `/opt/media-studio-gpu/runners/{flux3klein,ltx25}/requirements.lock` and the two venvs `/opt/media-studio-gpu/runners/{flux3klein,ltx25}/.venv`.
-- The base environment is the interpreter's own site-packages (`/usr/local/bin/python3`, Python in `/opt/python`); the FLUX venv sees it with `--system-site-packages`, the LTX venv does not.
-- `/opt/media-studio-gpu-base/` holds the three locks (`base.requirements.lock`, `flux3klein.requirements.lock`, `ltx25.requirements.lock`) and `REVISION`, the commit of this repository (also the label `org.opencontainers.image.revision`). A check in an image built on this one can compare installed versions with them.
+- `/opt/media-studio-gpu/base/requirements.lock`, `/opt/media-studio-gpu/runners/{flux3klein,ltx25,kandinsky6}/requirements.lock` and the three venvs `/opt/media-studio-gpu/runners/{flux3klein,ltx25,kandinsky6}/.venv`.
+- The base environment is the interpreter's own site-packages (`/usr/local/bin/python3`, Python in `/opt/python`); the FLUX venv sees it with `--system-site-packages`, the LTX and Kandinsky 6 venvs do not (each has its own torch 2.13.0 for CUDA 13.0).
+- `/opt/media-studio-gpu-base/` holds the four locks (`base.requirements.lock`, `flux3klein.requirements.lock`, `ltx25.requirements.lock`, `kandinsky6.requirements.lock`) and `REVISION`, the commit of this repository (also the label `org.opencontainers.image.revision`). A check in an image built on this one can compare installed versions with them.
 - The environment variables of the Dockerfile (`UV_*`, `PYTHONUNBUFFERED`, `HF_HUB_OFFLINE`, ...). No `USER`, no `CMD`, no `WORKDIR`.
 
-The build also checks what needs only public packages: the imports of both runners' libraries, the versions, natten with its CUDA kernels, a Triton compile with gcc, and the OpenSSL 3 and CA bundle the job host needs.
+The build also checks what needs only public packages: the imports of both runners' libraries, the versions, natten with its CUDA kernels, a Triton compile with gcc, and the OpenSSL 3 and CA bundle the job host needs. For Kandinsky 6 it imports torch, diffusers and the pipeline classes `Kandinsky6TI2VAPipeline` (text or image to video and audio, run with `sample_audio=False` for a silent clip) and `Kandinsky6SRPipeline` (the VSR super resolution), and prints `kandinsky6 venv ok: diffusers <version> torch <version> cuda <version> ...`. No weights are in the image; the private repository mounts them and adds the runner code.
 
 ## How it is built
 
@@ -33,6 +35,7 @@ The build also checks what needs only public packages: the imports of both runne
 - A push to `main` that changes the Dockerfile, the locks or the workflow, and a run by hand (Actions > build > Run workflow), build and push `ghcr.io/alsami/media-studio-gpu-base:sha-<12 characters of the commit>` and `:latest`. The digest is in the job summary.
 - The layer cache is `ghcr.io/alsami/media-studio-gpu-base-cache:layers` (`mode=max`), written by `main` only. The workflow frees about 30 GB of the runner first and prints `df -h` before and after.
 - Platform `linux/amd64`, timeout 180 minutes, a build of `main` is never cancelled.
+- Size: the last build, with two torch venvs, used about 18 GB of the runner's 145 GB. The Kandinsky 6 venv is a third torch with its CUDA 13.0 libraries (about as large as the LTX one, an estimate of 7 to 8 GB in the image), which still fits; check the `df -h` after line of the first build and say here what it showed.
 
 ## Raise a package (change a version)
 
