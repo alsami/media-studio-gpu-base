@@ -1,0 +1,17 @@
+# Same torch as the ltx25 venv: PyPI's torch 2.13.0 is built for CUDA 13.0, which the A100 hosts' driver 580 supports.
+torch==2.13.0
+torchvision==0.28.0
+# The CUDA 13.0 parts torch 2.13.0 was built with; left open, the resolver takes 13.5 parts, newer than the 13.0 the
+# driver reports (a driver 580 host).
+nvidia-nvjitlink==13.0.88
+cuda-bindings==13.0.3
+# Kandinsky 6 is in diffusers from 0.42.0: Kandinsky6TI2VAPipeline (text or image to video and audio) and
+# Kandinsky6SRPipeline (the VSR super resolution).
+diffusers==0.43.0
+# The text encoder (Qwen2.5-VL) and the CLIP encoder come from transformers; the version the flux3klein venv already
+# runs with diffusers 0.43.0.
+transformers==5.23.0
+# enable_model_cpu_offload and low_cpu_mem_usage loading need it.
+accelerate==1.15.0
+# diffusers.utils.encode_video (the pipeline's documented export, with or without audio) imports PyAV.
+av==19.0.2
