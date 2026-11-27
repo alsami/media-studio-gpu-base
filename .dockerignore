@@ -6,3 +6,4 @@
 !runners/ltx25/requirements.in
 !runners/ltx25/requirements.lock
 !runners/ltx25/compiler_check.c
+!runners/kandinsky6/requirements.lock
